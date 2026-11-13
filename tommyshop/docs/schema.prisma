@@ -1,0 +1,377 @@
+// Tommy Market – Sales, Inventory, Credit & Transfer Verification
+// Stack: Next.js + Prisma + Supabase (Postgres, Auth, Storage)
+//
+// DATABASE_URL = Supabase pooled connection (port 6543, ?pgbouncer=true)
+// DIRECT_URL   = Supabase direct connection (port 5432) used for migrations
+// If you use Prisma 7, move url/directUrl into prisma.config.ts.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ───────────────────────── Enums ─────────────────────────
+
+enum Role {
+  ADMIN
+  SALES
+}
+
+enum Unit {
+  KG
+  PIECE
+}
+
+enum MovementType {
+  PURCHASE         // + stock in
+  SALE             // - stock out
+  SALE_VOID        // + returned after a sale is voided
+  WASTE            // - spoiled, trimmed, lost, sample
+  ADJUSTMENT       // +/- manual admin correction
+  COUNT_ADJUSTMENT // +/- from a physical stock count
+}
+
+enum SaleStatus {
+  COMPLETED
+  VOIDED
+}
+
+enum PayMethod {
+  CASH
+  TRANSFER
+}
+
+enum PayKind {
+  SALE // paid at the time of sale
+  DEBT // paid later against a customer's credit balance
+}
+
+enum VerifyStatus {
+  NOT_REQUIRED // cash
+  PENDING      // transfer waiting for admin
+  VERIFIED
+  REJECTED
+}
+
+enum DayStatus {
+  OPEN
+  CLOSED
+}
+
+// ───────────────────────── Users ─────────────────────────
+
+// id = auth.users.id from Supabase Auth
+model Profile {
+  id        String   @id @db.Uuid
+  fullName  String
+  phone     String?  @unique
+  username  String   @unique
+  role      Role     @default(SALES)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  sales          Sale[]          @relation("SaleCreatedBy")
+  payments       Payment[]       @relation("PaymentReceivedBy")
+  verifiedPays   Payment[]       @relation("PaymentVerifiedBy")
+  purchases      Purchase[]
+  movements      StockMovement[]
+  expenses       Expense[]
+  closings       DailyClosing[]
+  stockCounts    StockCount[]
+  auditLogs      AuditLog[]
+}
+
+// ───────────────────────── Catalog ─────────────────────────
+
+model Item {
+  id            String   @id @default(uuid()) @db.Uuid
+  name          String   @unique          // one canonical spelling: "Telapia"
+  nameAm        String?                   // Amharic label
+  unit          Unit     @default(KG)
+  category      String?                   // Fish, Chicken, Dairy ...
+  sellPrice     Decimal  @db.Decimal(12, 2)
+  avgCost       Decimal  @default(0) @db.Decimal(12, 2) // weighted average cost
+  stockQty      Decimal  @default(0) @db.Decimal(12, 3) // cache, updated with every movement
+  lowStockLevel Decimal  @default(0) @db.Decimal(12, 3)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  prices        PriceHistory[]
+  saleItems     SaleItem[]
+  purchaseItems PurchaseItem[]
+  movements     StockMovement[]
+  countItems    StockCountItem[]
+}
+
+model PriceHistory {
+  id            String   @id @default(uuid()) @db.Uuid
+  itemId        String   @db.Uuid
+  sellPrice     Decimal  @db.Decimal(12, 2)
+  effectiveFrom DateTime @default(now())
+  setById       String?  @db.Uuid
+
+  item Item @relation(fields: [itemId], references: [id])
+
+  @@index([itemId, effectiveFrom])
+}
+
+// ───────────────────────── Purchasing ─────────────────────────
+
+model Supplier {
+  id        String     @id @default(uuid()) @db.Uuid
+  name      String
+  phone     String?
+  note      String?
+  isActive  Boolean    @default(true)
+  purchases Purchase[]
+}
+
+model Purchase {
+  id           String   @id @default(uuid()) @db.Uuid
+  supplierId   String?  @db.Uuid
+  purchaseDate DateTime @db.Date
+  totalCost    Decimal  @db.Decimal(14, 2)
+  amountPaid   Decimal  @default(0) @db.Decimal(14, 2)
+  note         String?
+  createdById  String   @db.Uuid
+  createdAt    DateTime @default(now())
+
+  supplier  Supplier?      @relation(fields: [supplierId], references: [id])
+  createdBy Profile        @relation(fields: [createdById], references: [id])
+  items     PurchaseItem[]
+
+  @@index([purchaseDate])
+}
+
+model PurchaseItem {
+  id         String  @id @default(uuid()) @db.Uuid
+  purchaseId String  @db.Uuid
+  itemId     String  @db.Uuid
+  qty        Decimal @db.Decimal(12, 3)
+  unitCost   Decimal @db.Decimal(12, 2)
+  lineTotal  Decimal @db.Decimal(14, 2)
+
+  purchase Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  item     Item     @relation(fields: [itemId], references: [id])
+}
+
+// ───────────────────────── Customers & credit ─────────────────────────
+
+model Customer {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String
+  phone       String?
+  address     String?
+  creditLimit Decimal  @default(0) @db.Decimal(14, 2)
+  maxDebtDays Int?                         // block new credit if debt is older than this
+  isActive    Boolean  @default(true)
+  note        String?
+  createdAt   DateTime @default(now())
+
+  sales    Sale[]
+  payments Payment[]
+
+  @@index([name])
+}
+
+// ───────────────────────── Sales ─────────────────────────
+
+model Sale {
+  id           String     @id @default(uuid()) @db.Uuid
+  number       Int        @unique @default(autoincrement())
+  clientId     String?    @unique              // idempotency key for offline sync
+  businessDate DateTime   @db.Date
+  customerId   String?    @db.Uuid
+  createdById  String     @db.Uuid
+  status       SaleStatus @default(COMPLETED)
+  total        Decimal    @db.Decimal(14, 2)
+  paidAmount   Decimal    @default(0) @db.Decimal(14, 2) // paid at sale time + later allocations
+  balanceDue   Decimal    @default(0) @db.Decimal(14, 2) // credit still owed (total - paid)
+  note         String?
+  createdAt    DateTime   @default(now())
+  voidedAt     DateTime?
+  voidedById   String?    @db.Uuid
+  voidReason   String?
+
+  customer    Customer?           @relation(fields: [customerId], references: [id])
+  createdBy   Profile             @relation("SaleCreatedBy", fields: [createdById], references: [id])
+  items       SaleItem[]
+  payments    Payment[]
+  allocations PaymentAllocation[]
+
+  @@index([businessDate])
+  @@index([customerId, balanceDue])
+}
+
+model SaleItem {
+  id        String  @id @default(uuid()) @db.Uuid
+  saleId    String  @db.Uuid
+  itemId    String  @db.Uuid
+  qty       Decimal @db.Decimal(12, 3)
+  unitPrice Decimal @db.Decimal(12, 2)
+  unitCost  Decimal @db.Decimal(12, 2)   // avgCost copied at sale time → profit stays fixed
+  lineTotal Decimal @db.Decimal(14, 2)
+
+  sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  item Item @relation(fields: [itemId], references: [id])
+
+  @@index([itemId])
+}
+
+// ───────────────────────── Payments ─────────────────────────
+
+model Payment {
+  id             String       @id @default(uuid()) @db.Uuid
+  kind           PayKind
+  method         PayMethod
+  amount         Decimal      @db.Decimal(14, 2)
+  businessDate   DateTime     @db.Date
+  saleId         String?      @db.Uuid     // kind = SALE
+  customerId     String?      @db.Uuid     // kind = DEBT
+  receivedById   String       @db.Uuid
+
+  // transfer evidence
+  bankName       String?                    // CBE, Telebirr, Awash ...
+  reference      String?                    // transaction / reference number
+  screenshotPath String?                    // Supabase Storage path (private bucket)
+  imageHash      String?      @unique       // blocks the same screenshot being reused
+  verifyStatus   VerifyStatus @default(NOT_REQUIRED)
+  verifiedById   String?      @db.Uuid
+  verifiedAt     DateTime?
+  rejectReason   String?
+  createdAt      DateTime     @default(now())
+
+  sale        Sale?               @relation(fields: [saleId], references: [id])
+  customer    Customer?           @relation(fields: [customerId], references: [id])
+  receivedBy  Profile             @relation("PaymentReceivedBy", fields: [receivedById], references: [id])
+  verifiedBy  Profile?            @relation("PaymentVerifiedBy", fields: [verifiedById], references: [id])
+  allocations PaymentAllocation[]
+
+  @@unique([bankName, reference])           // duplicate reference per bank is rejected
+  @@index([businessDate, method, verifyStatus])
+}
+
+// How a DEBT payment is spread over a customer's unpaid sales (oldest first)
+model PaymentAllocation {
+  id        String  @id @default(uuid()) @db.Uuid
+  paymentId String  @db.Uuid
+  saleId    String  @db.Uuid
+  amount    Decimal @db.Decimal(14, 2)
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  sale    Sale    @relation(fields: [saleId], references: [id])
+
+  @@index([saleId])
+}
+
+// ───────────────────────── Inventory ─────────────────────────
+
+// Single source of truth for stock. Item.stockQty is a cache of SUM(qty).
+model StockMovement {
+  id           String       @id @default(uuid()) @db.Uuid
+  itemId       String       @db.Uuid
+  type         MovementType
+  qty          Decimal      @db.Decimal(12, 3)  // signed: + in, - out
+  unitCost     Decimal?     @db.Decimal(12, 2)
+  reason       String?                          // for WASTE / ADJUSTMENT
+  refType      String?                          // "Sale" | "Purchase" | "StockCount"
+  refId        String?      @db.Uuid
+  businessDate DateTime     @db.Date
+  createdById  String       @db.Uuid
+  createdAt    DateTime     @default(now())
+
+  item      Item    @relation(fields: [itemId], references: [id])
+  createdBy Profile @relation(fields: [createdById], references: [id])
+
+  @@index([itemId, businessDate])
+  @@index([refType, refId])
+}
+
+model StockCount {
+  id          String   @id @default(uuid()) @db.Uuid
+  countDate   DateTime @db.Date
+  createdById String   @db.Uuid
+  applied     Boolean  @default(false)
+  note        String?
+  createdAt   DateTime @default(now())
+
+  createdBy Profile          @relation(fields: [createdById], references: [id])
+  items     StockCountItem[]
+}
+
+model StockCountItem {
+  id           String  @id @default(uuid()) @db.Uuid
+  stockCountId String  @db.Uuid
+  itemId       String  @db.Uuid
+  systemQty    Decimal @db.Decimal(12, 3)
+  countedQty   Decimal @db.Decimal(12, 3)
+  difference   Decimal @db.Decimal(12, 3)
+
+  stockCount StockCount @relation(fields: [stockCountId], references: [id], onDelete: Cascade)
+  item       Item       @relation(fields: [itemId], references: [id])
+}
+
+// ───────────────────────── Money control ─────────────────────────
+
+model Expense {
+  id           String    @id @default(uuid()) @db.Uuid
+  businessDate DateTime  @db.Date
+  category     String                      // transport, electricity, salary ...
+  description  String?
+  amount       Decimal   @db.Decimal(14, 2)
+  method       PayMethod @default(CASH)
+  createdById  String    @db.Uuid
+  createdAt    DateTime  @default(now())
+
+  createdBy Profile @relation(fields: [createdById], references: [id])
+
+  @@index([businessDate])
+}
+
+model DailyClosing {
+  id               String    @id @default(uuid()) @db.Uuid
+  businessDate     DateTime  @unique @db.Date
+  status           DayStatus @default(OPEN)
+
+  // snapshot saved when the day is closed
+  totalSales       Decimal   @default(0) @db.Decimal(14, 2) // revenue incl. credit
+  cashReceived     Decimal   @default(0) @db.Decimal(14, 2)
+  transferVerified Decimal   @default(0) @db.Decimal(14, 2)
+  transferPending  Decimal   @default(0) @db.Decimal(14, 2)
+  creditGiven      Decimal   @default(0) @db.Decimal(14, 2)
+  debtCollected    Decimal   @default(0) @db.Decimal(14, 2)
+  cashExpenses     Decimal   @default(0) @db.Decimal(14, 2)
+  expectedCash     Decimal   @default(0) @db.Decimal(14, 2)
+  countedCash      Decimal?  @db.Decimal(14, 2)
+  cashDifference   Decimal?  @db.Decimal(14, 2)
+  grossProfit      Decimal   @default(0) @db.Decimal(14, 2)
+
+  pdfVersion       Int       @default(0)
+  pdfAdminPath     String?
+  pdfSalesPath     String?
+  closedById       String?   @db.Uuid
+  closedAt         DateTime?
+
+  closedBy Profile? @relation(fields: [closedById], references: [id])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String?  @db.Uuid
+  action    String                         // CREATE | UPDATE | VOID | VERIFY | REJECT | CLOSE_DAY | REOPEN_DAY ...
+  entity    String
+  entityId  String?
+  before    Json?
+  after     Json?
+  createdAt DateTime @default(now())
+
+  user Profile? @relation(fields: [userId], references: [id])
+
+  @@index([entity, entityId])
+  @@index([createdAt])
+}
