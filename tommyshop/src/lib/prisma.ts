@@ -12,6 +12,16 @@ function createPrismaClient() {
   return new PrismaClient({ adapter, log: ['error'] });
 }
 
-const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
-export const prisma = globalForPrisma.prisma ?? createPrismaClient();
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+// Use a getter so the client is only created when first accessed, not at import time
+const globalForPrisma = globalThis as unknown as { _prisma?: PrismaClient };
+
+export const prisma = new Proxy({} as PrismaClient, {
+  get(_target, prop) {
+    if (!globalForPrisma._prisma) {
+      globalForPrisma._prisma = createPrismaClient();
+    }
+    const client = globalForPrisma._prisma;
+    const value = (client as unknown as Record<string, unknown>)[prop as string];
+    return typeof value === 'function' ? value.bind(client) : value;
+  },
+});
