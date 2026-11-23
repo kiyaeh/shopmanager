@@ -37,14 +37,14 @@ const ITEMS = [
   { name: 'Drum stick',    nameAm: 'ድረም ስቲክ',  unit: Unit.KG,    category: 'Chicken', sellPrice: 750,  lowStockLevel: 2 },
   { name: 'Cheese',        nameAm: 'ጥብስ',      unit: Unit.KG,    category: 'Dairy',   sellPrice: 850,  lowStockLevel: 1 },
   { name: 'Telapia',       nameAm: 'ቴላፒያ',     unit: Unit.KG,    category: 'Fish',    sellPrice: 900,  lowStockLevel: 2 },
-  { name: 'Nati telapiha', nameAm: 'ናቲ ቴላፒሃ', unit: Unit.KG,    category: 'Fish',    sellPrice: 900,  lowStockLevel: 2 },
-  { name: 'Chekin',        nameAm: 'ቺኪን',      unit: Unit.KG,    category: 'Chicken', sellPrice: 1300, lowStockLevel: 2 },
-  { name: 'Prop cheese',   nameAm: 'ፕሮፕ ቺዝ',  unit: Unit.KG,    category: 'Dairy',   sellPrice: 1300, lowStockLevel: 1 },
-  { name: 'Brest',         nameAm: 'ብሬስት',     unit: Unit.KG,    category: 'Chicken', sellPrice: 1300, lowStockLevel: 2 },
-  { name: 'Suwarma',       nameAm: 'ሱዋርማ',     unit: Unit.KG,    category: 'Meat',    sellPrice: 1300, lowStockLevel: 2 },
-  { name: 'Whole chekin',  nameAm: 'ሙሉ ቺኪን',  unit: Unit.PIECE, category: 'Chicken', sellPrice: 1200, lowStockLevel: 5 },
-  { name: 'Butter',        nameAm: 'ቅቤ',       unit: Unit.PIECE, category: 'Dairy',   sellPrice: 350,  lowStockLevel: 10 },
-];
+  // { name: 'Nati telapiha', nameAm: 'ናቲ ቴላፒሃ', unit: Unit.KG,    category: 'Fish',    sellPrice: 900,  lowStockLevel: 2 },
+  { name: 'Chicken',        nameAm: 'ቺኪን',      unit: Unit.KG,    category: 'Chicken', sellPrice: 1300, lowStockLevel: 2 },
+  { name: 'Provolene cheese',   nameAm: 'ፕሮፕ ቺዝ',  unit: Unit.KG,    category: 'Dairy',   sellPrice: 1300, lowStockLevel: 1 },
+  { name: 'Breast',         nameAm: 'ብሬስት',     unit: Unit.KG,    category: 'Chicken', sellPrice: 1300, lowStockLevel: 2 },
+  { name: 'Shewarma',       nameAm: 'ሱዋርማ',     unit: Unit.KG,    category: 'Meat',    sellPrice: 1300, lowStockLevel: 2 },
+  { name: 'Whole chicken',  nameAm: 'ሙሉ ቺኪን',  unit: Unit.PIECE, category: 'Chicken', sellPrice: 1200, lowStockLevel: 5 },
+  { name: 'Butter',        nameAm: 'ቅቤ',      unit: Unit.PIECE, category: 'Dairy',   sellPrice: 350,  lowStockLevel: 10 },
+]
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

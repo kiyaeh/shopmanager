@@ -1,21 +1,23 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { getQueueCount } from '@/lib/offline/db';
-import { syncQueue } from '@/lib/offline/sync';
 
 export function SyncBadge() {
+  // Use null as initial state to avoid hydration mismatch
+  // null = not yet mounted (server), then update on client
+  const [online, setOnline] = useState<boolean | null>(null);
   const [count, setCount] = useState(0);
-  const [online, setOnline] = useState(true);
 
   useEffect(() => {
+    // Now we're on the client
     setOnline(navigator.onLine);
 
     const updateCount = async () => {
       try {
+        const { getQueueCount } = await import('@/lib/offline/db');
         const n = await getQueueCount();
         setCount(n);
       } catch {
-        // IndexedDB not available (SSR guard)
+        // IndexedDB not available
       }
     };
 
@@ -24,7 +26,7 @@ export function SyncBadge() {
 
     const handleOnline = () => {
       setOnline(true);
-      syncQueue().then(updateCount);
+      import('@/lib/offline/sync').then(m => m.syncQueue()).then(updateCount);
     };
     const handleOffline = () => setOnline(false);
 
@@ -37,6 +39,9 @@ export function SyncBadge() {
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
+
+  // Don't render anything until client-side mounted (prevents hydration mismatch)
+  if (online === null) return null;
 
   if (!online) {
     return (
