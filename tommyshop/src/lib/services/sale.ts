@@ -28,8 +28,9 @@ export async function createSale(
   // Check day not closed
   await checkDayNotClosed(tx, businessDate);
 
-  // Fetch items
-  const dbItems = await tx.item.findMany({ where: { id: { in: input.items.map(i => i.itemId) } } });
+  // Fetch items — explicit type needed since PrismaTransaction is typed as any
+  type ItemRow = { id: string; name: string; isActive: boolean; stockQty: { toString(): string }; avgCost: { toString(): string } };
+  const dbItems: ItemRow[] = await tx.item.findMany({ where: { id: { in: input.items.map((i: { itemId: string }) => i.itemId) } } });
   const itemMap = new Map(dbItems.map(i => [i.id, i]));
 
   // Stock validation

@@ -1,7 +1,5 @@
 import { createServerClient } from './supabase/server';
 import { prisma } from './prisma';
-import type { Profile } from '@prisma/client';
-import { Role } from '@prisma/client';
 import { AuthError } from './errors';
 
 // Re-export so existing imports from '@/lib/auth' still work
@@ -13,13 +11,13 @@ export function usernameToEmail(username: string): string {
 
 export async function getSession() {
   const supabase = await createServerClient();
-  // Try refreshing the session first to handle token expiry
-  const { data: { user }, error } = await supabase.auth.getUser();
-  if (error || !user) throw new AuthError(401, 'Not authenticated');
-  return user;
+  const { data: { session }, error } = await supabase.auth.getSession();
+  if (error || !session?.user) throw new AuthError(401, 'Not authenticated');
+  return session.user;
 }
 
-export async function requireRole(minimumRole: Role): Promise<Profile> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function requireRole(minimumRole: string): Promise<any> {
   const user = await getSession();
   const profile = await prisma.profile.findUnique({
     where: { id: user.id, isActive: true },

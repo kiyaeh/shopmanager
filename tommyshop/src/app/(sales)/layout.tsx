@@ -8,7 +8,9 @@ import { LogoutButton } from '@/components/ui/LogoutButton';
 
 export default async function SalesLayout({ children }: { children: React.ReactNode }) {
   await requireRole('SALES').catch((err: unknown) => {
-    if (err instanceof AuthError) redirect('/login');
+    // Only redirect to login on 401 (not authenticated)
+    // 403 means logged in but wrong role — show error page instead
+    if (err instanceof AuthError && err.status === 401) redirect('/login');
     throw err;
   });
 

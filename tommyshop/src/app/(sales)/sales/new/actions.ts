@@ -1,5 +1,4 @@
 'use server';
-import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/auth';
 import { createSale } from '@/lib/services/sale';
@@ -15,7 +14,7 @@ export async function createSaleAction(rawInput: unknown) {
     const sale = await prisma.$transaction(tx =>
       createSale(tx, profile.id, profile.role, parsed.data)
     );
-    revalidatePath('/sales/today');
+    // Don't revalidate here — client does router.push which fetches fresh data
     return { ok: true as const, saleId: sale.id };
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Failed to create sale';

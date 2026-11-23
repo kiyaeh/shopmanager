@@ -7,7 +7,7 @@ import { LogoutButton } from '@/components/ui/LogoutButton';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const profile = await requireRole('ADMIN').catch((err: unknown) => {
-    if (err instanceof AuthError) redirect('/login');
+    if (err instanceof AuthError && err.status === 401) redirect('/login');
     throw err;
   });
 

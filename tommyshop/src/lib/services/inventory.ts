@@ -174,7 +174,7 @@ export async function reconcileStock(): Promise<
   { itemId: string; name: string; cached: string; computed: string; diff: string }[]
 > {
   const items = await prisma.item.findMany({ select: { id: true, name: true, stockQty: true } });
-  const discrepancies = [];
+  const discrepancies: { itemId: string; name: string; cached: string; computed: string; diff: string }[] = [];
 
   for (const item of items) {
     const agg = await prisma.stockMovement.aggregate({

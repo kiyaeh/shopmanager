@@ -1,9 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient, Unit, MovementType } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import Decimal from 'decimal.js';
 import * as dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
+
+// Use string literals for enums since Prisma 7 changed export paths
+const Unit = { KG: 'KG', PIECE: 'PIECE' } as const;
+const MovementType = { PURCHASE: 'PURCHASE', SALE: 'SALE', ADJUSTMENT: 'ADJUSTMENT' } as const;
 
 // ─── Supabase admin client (service role) ────────────────────────────────────
 const supabaseAdmin = createClient(
