@@ -3,19 +3,11 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/auth';
 import { formatETB } from '@/lib/money';
-import { createItem } from './actions';
+import { createItemAndRedirect } from './actions';
 import Decimal from 'decimal.js';
 
 export default async function ItemsPage() {
   await requireRole('ADMIN');
-
-  async function handleCreate(formData: FormData) {
-    'use server';
-    const result = await createItem(formData);
-    if (result?.itemId) {
-      redirect(`/admin/items/${result.itemId}`);
-    }
-  }
 
   const items = await prisma.item.findMany({
     include: {
@@ -32,7 +24,7 @@ export default async function ItemsPage() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">Items</h1>
         <Link
-          href="/admin/items/new"
+          href="/items/new"
           className="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors"
         >
           + Add Item
@@ -115,7 +107,7 @@ export default async function ItemsPage() {
                   </td>
                   <td className="px-4 py-3 text-center">
                     <Link
-                      href={`/admin/items/${item.id}`}
+                      href={`/items/${item.id}`}
                       className="inline-flex items-center rounded-md border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
                     >
                       Edit
@@ -131,7 +123,7 @@ export default async function ItemsPage() {
       {/* Add Item */}
       <section className="mt-6 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6 space-y-4">
         <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">Add Item</h2>
-        <form action={handleCreate} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <form action={createItemAndRedirect} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
               Name <span className="text-red-500">*</span>

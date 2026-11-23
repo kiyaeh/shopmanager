@@ -3,27 +3,26 @@ import { EthiopianDateProvider } from '@/components/providers/EthiopianDateProvi
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { AuthError } from '@/lib/errors';
+import { LogoutButton } from '@/components/ui/LogoutButton';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  try {
-    await requireRole('ADMIN');
-  } catch (err) {
+  const profile = await requireRole('ADMIN').catch((err: unknown) => {
     if (err instanceof AuthError) redirect('/login');
     throw err;
-  }
+  });
 
   const navItems = [
-    { href: '/admin/dashboard', label: 'Dashboard', icon: '📊' },
-    { href: '/admin/transfers', label: 'Transfers', icon: '💸' },
-    { href: '/admin/sales', label: 'Sales', icon: '🛒' },
-    { href: '/admin/inventory', label: 'Inventory', icon: '📦' },
-    { href: '/admin/customers', label: 'Customers', icon: '👥' },
-    { href: '/admin/expenses', label: 'Expenses', icon: '💰' },
-    { href: '/admin/reports', label: 'Reports', icon: '📄' },
-    { href: '/admin/items', label: 'Items', icon: '🏷️' },
-    { href: '/admin/users', label: 'Users', icon: '👤' },
-    { href: '/admin/audit', label: 'Audit Log', icon: '🔍' },
-    { href: '/admin/health', label: 'Health', icon: '❤️' },
+    { href: '/dashboard', label: 'Dashboard', icon: '📊' },
+    { href: '/transfers', label: 'Transfers', icon: '💸' },
+    { href: '/sales', label: 'Sales', icon: '🛒' },
+    { href: '/inventory', label: 'Inventory', icon: '📦' },
+    { href: '/customers', label: 'Customers', icon: '👥' },
+    { href: '/expenses', label: 'Expenses', icon: '💰' },
+    { href: '/reports', label: 'Reports', icon: '📄' },
+    { href: '/items', label: 'Items', icon: '🏷️' },
+    { href: '/users', label: 'Users', icon: '👤' },
+    { href: '/audit', label: 'Audit Log', icon: '🔍' },
+    { href: '/health', label: 'Health', icon: '❤️' },
   ];
 
   return (
@@ -47,6 +46,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               </Link>
             ))}
           </nav>
+          <div className="border-t border-zinc-200 dark:border-zinc-800 py-2">
+            <div className="px-4 py-2 text-xs text-zinc-400">{profile?.username ?? 'admin'}</div>
+            <LogoutButton />
+          </div>
         </aside>
 
         {/* Main content */}

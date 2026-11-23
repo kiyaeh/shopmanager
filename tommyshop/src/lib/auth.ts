@@ -13,6 +13,7 @@ export function usernameToEmail(username: string): string {
 
 export async function getSession() {
   const supabase = await createServerClient();
+  // Try refreshing the session first to handle token expiry
   const { data: { user }, error } = await supabase.auth.getUser();
   if (error || !user) throw new AuthError(401, 'Not authenticated');
   return user;

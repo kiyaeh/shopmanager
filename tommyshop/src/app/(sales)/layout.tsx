@@ -4,14 +4,13 @@ import { SyncBadge } from '@/components/sales/SyncBadge';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { AuthError } from '@/lib/errors';
+import { LogoutButton } from '@/components/ui/LogoutButton';
 
 export default async function SalesLayout({ children }: { children: React.ReactNode }) {
-  try {
-    await requireRole('SALES');
-  } catch (err) {
+  await requireRole('SALES').catch((err: unknown) => {
     if (err instanceof AuthError) redirect('/login');
     throw err;
-  }
+  });
 
   return (
     <EthiopianDateProvider>
@@ -19,7 +18,10 @@ export default async function SalesLayout({ children }: { children: React.ReactN
         {/* Header */}
         <header className="sticky top-0 z-10 bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 px-4 h-14 flex items-center justify-between">
           <span className="font-bold text-lg">Tommy Market</span>
-          <SyncBadge />
+          <div className="flex items-center gap-3">
+            <SyncBadge />
+            <LogoutButton compact />
+          </div>
         </header>
 
         {/* Page content */}

@@ -65,7 +65,7 @@ export async function updatePrice(formData: FormData) {
     await writeLog(tx, admin.id, 'PRICE_CHANGE', 'Item', itemId, before, after);
   });
 
-  revalidatePath('/admin/items');
+  revalidatePath('/items');
   revalidatePath(`/admin/items/${itemId}`);
 }
 
@@ -86,7 +86,7 @@ export async function toggleItemActive(formData: FormData) {
     await writeLog(tx, admin.id, 'ITEM_TOGGLE', 'Item', itemId, before, after);
   });
 
-  revalidatePath('/admin/items');
+  revalidatePath('/items');
   revalidatePath(`/admin/items/${itemId}`);
 }
 
@@ -124,7 +124,7 @@ export async function updateItemDetails(formData: FormData) {
     await writeLog(tx, admin.id, 'ITEM_UPDATE', 'Item', itemId, before, after);
   });
 
-  revalidatePath('/admin/items');
+  revalidatePath('/items');
   revalidatePath(`/admin/items/${itemId}`);
 }
 
@@ -171,6 +171,18 @@ export async function createItem(formData: FormData) {
     return created;
   });
 
-  revalidatePath('/admin/items');
+  revalidatePath('/items');
   return { itemId: item.id };
+}
+
+// ─── createItemAndRedirect ────────────────────────────────────────────────────
+// Used as a form action — creates the item and redirects to its detail page.
+
+import { redirect } from 'next/navigation';
+
+export async function createItemAndRedirect(formData: FormData) {
+  const result = await createItem(formData);
+  if (result?.itemId) {
+    redirect(`/items/${result.itemId}`);
+  }
 }

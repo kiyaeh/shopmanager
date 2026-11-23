@@ -35,8 +35,8 @@ export async function signInAction(formData: FormData): Promise<{ error: string 
 
   // Redirect based on role
   if (profile.role === 'ADMIN') {
-    redirect('/admin/dashboard');
+    redirect('/dashboard');
   } else {
-    redirect('/sales/today');
+    redirect('/today');
   }
 }
