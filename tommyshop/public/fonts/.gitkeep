@@ -1,0 +1,4 @@
+# Font files go here
+# Download NotoSansEthiopic-Regular.ttf and NotoSansEthiopic-Bold.ttf
+# from https://fonts.google.com/noto/specimen/Noto+Sans+Ethiopic
+# In production the fonts are fetched directly from fonts.gstatic.com
