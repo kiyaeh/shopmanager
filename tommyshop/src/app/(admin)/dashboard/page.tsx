@@ -36,11 +36,18 @@ export default async function DashboardPage() {
   const todayRevenue = todaySales.reduce((s, sale) => s.add(sale.total.toString()), new Decimal(0));
 
   // Action card counts
-  const [pendingTransfers, lowStockItems, openOldDays] = await Promise.all([
+  const [pendingTransfers, allActiveItems, openOldDays] = await Promise.all([
     prisma.payment.count({ where: { method: 'TRANSFER', verifyStatus: 'PENDING' } }),
-    prisma.$queryRaw<{ count: bigint }[]>`SELECT COUNT(*) as count FROM "Item" WHERE "isActive" = true AND "stockQty" <= "lowStockLevel"`.then(r => Number(r[0]?.count ?? 0)),
+    prisma.item.findMany({
+      where: { isActive: true },
+      select: { stockQty: true, lowStockLevel: true },
+    }),
     prisma.dailyClosing.count({ where: { status: 'OPEN', businessDate: { lt: today } } }),
   ]);
+
+  const lowStockItems = allActiveItems.filter(i =>
+    new Decimal(i.stockQty.toString()).lte(new Decimal(i.lowStockLevel.toString()))
+  ).length;
 
   // Overdue customers
   const overdueCustomers = await prisma.customer.count({
